@@ -19,7 +19,6 @@ export const callbackHandler = async (
     // 2. Lookup task_id in TaskStore
     const mapping = TaskStore.getMapping(task_id);
     if (!mapping) {
-      // Could be idempotent callback handling or timeout already occurred
       logger.error("RC", "Error handling callback: missing mapping", {
         task_id,
       });
@@ -27,16 +26,18 @@ export const callbackHandler = async (
       return;
     }
 
-    // 3. Update the original message in Rocket.Chat
-    let updateText = `Task ended with status: ${status}`;
-    if (result) updateText = result;
+    // 3. Update the original message OR send a new message in Rocket.Chat
+    // User desired output structure:
+    // OpenClaw Task Completed
+    // Deployment successful
+    const outputMessage = `**OpenClaw Task Completed**\n${result || "Operation finished"}`;
 
-    await MessageService.updateMessage(
-      mapping.roomId,
-      mapping.messageId,
-      updateText,
-    );
-    logger.info("RC", "Message updated via callback", { taskId: task_id });
+    // Send a new message simulating RC posting to the room
+    await MessageService.sendMessage(mapping.roomId, outputMessage);
+
+    logger.info("RC", "Message mapped and posted via callback", {
+      taskId: task_id,
+    });
 
     // 4. Delete mapping after completion (avoid memory leaks)
     TaskStore.deleteMapping(task_id);

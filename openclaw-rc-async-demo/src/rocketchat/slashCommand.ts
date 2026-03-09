@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import { logger } from "../logger";
 import { MessageService } from "./messageService";
-import { TaskRouter } from "../services/taskRouter";
+import { TaskStore } from "../store/taskStore";
+import { OpenclawClient } from "../services/openclawClient";
+import { config } from "../config";
 
 export const slashCommandHandler = async (
   req: Request,
@@ -12,20 +14,36 @@ export const slashCommandHandler = async (
 
     logger.info("RC", "Slash command received", { user_id, room_id, text });
 
-    // Send a placeholder message immediately
-    const messageId = await MessageService.sendMessage(
+    // Simulate user typing message in the exact style
+    await MessageService.sendMessage(room_id, text, user_id);
+
+    // Call OpenClaw
+    const callbackUrl = `${config.appUrl}/api/callback`;
+    const result = await OpenclawClient.createTask(text, callbackUrl);
+
+    if (!result || !result.task_id) {
+      await MessageService.sendMessage(room_id, "Error: Could not start task.");
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    const { task_id } = result;
+
+    // Send the bot reply
+    const botMessageId = await MessageService.sendMessage(
       room_id,
-      "Processing your request...",
+      `Processing task...\ntask_id: ${task_id}`,
     );
 
-    // Route the task to OpenClaw
-    await TaskRouter.routeTask(text, {
+    // Create the memory mapping
+    TaskStore.createMapping({
+      taskId: task_id,
       userId: user_id,
       roomId: room_id,
-      messageId,
+      messageId: botMessageId,
+      createdAt: Date.now(),
     });
 
-    // Respond to slash command webhook (usually HTTP 200)
     res.status(200).json({ success: true });
   } catch (error: any) {
     logger.error("RC", "Error handling slash command", {

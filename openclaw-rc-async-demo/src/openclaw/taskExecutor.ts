@@ -10,7 +10,7 @@ export const TaskExecutor = {
       const payload = {
         task_id,
         status: "completed",
-        result: `Deployment completed successfully 🚀 (Task: ${command})`,
+        result: "Deployment successful",
       };
 
       try {
