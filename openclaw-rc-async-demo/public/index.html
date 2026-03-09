@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rocket.Chat Mock</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        margin: 0;
+        background: #e5e5e5;
+        display: flex;
+        justify-content: center;
+        height: 100vh;
+      }
+      .chat-container {
+        width: 100%;
+        max-width: 600px;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        background: #1f2329;
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+      }
+      .messages {
+        flex-grow: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .message {
+        display: flex;
+        flex-direction: column;
+        max-width: 80%;
+      }
+      .message.user {
+        align-self: flex-end;
+        align-items: flex-end;
+      }
+      .message.bot {
+        align-self: flex-start;
+      }
+      .bubble {
+        padding: 10px 15px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        font-size: 0.95rem;
+      }
+      .user .bubble {
+        background: #0052cc;
+        color: white;
+        border-bottom-right-radius: 0;
+      }
+      .bot .bubble {
+        background: #f2f3f5;
+        color: #1f2329;
+        border-bottom-left-radius: 0;
+        border: 1px solid #e1e5e8;
+      }
+      .input-area {
+        display: flex;
+        padding: 15px;
+        border-top: 1px solid #ddd;
+        background: #fff;
+      }
+      input {
+        flex-grow: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+      button {
+        background: #0052cc;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin-left: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #0047b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="header"># general</div>
+      <div class="messages" id="messages">
+        <div class="message bot">
+          <div class="bubble">
+            Welcome to the integration workspace! Type a command below.
+          </div>
+        </div>
+      </div>
+      <div class="input-area">
+        <input
+          type="text"
+          id="commandInput"
+          placeholder="e.g. /openclaw deploy repo"
+          autocomplete="off"
+        />
+        <button onclick="sendCommand()">Send</button>
+      </div>
+    </div>
+
+    <script>
+      const messagesDiv = document.getElementById("messages");
+
+      // Auto-scroll logic
+      function scrollToBottom() {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function addMessage(text, type, messageId) {
+        // If updating an existing message
+        if (messageId) {
+          const existing = document.getElementById(messageId);
+          if (existing) {
+            existing.querySelector(".bubble").textContent = text;
+            return;
+          }
+        }
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message " + type;
+        if (messageId) {
+          msgDiv.id = messageId;
+        }
+        msgDiv.innerHTML = `<div class="bubble">${text}</div>`;
+        messagesDiv.appendChild(msgDiv);
+        scrollToBottom();
+      }
+
+      async function sendCommand() {
+        const input = document.getElementById("commandInput");
+        const text = input.value.trim();
+        if (!text) return;
+
+        input.value = "";
+
+        try {
+          await fetch("/api/slash-command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: "user_demo_1",
+              room_id: "room_demo_1",
+              text: text,
+            }),
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const evtSource = new EventSource("/api/stream");
+      evtSource.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        if (data.type === "new") {
+          const isUser = data.senderId === "user_demo_1";
+          addMessage(data.text, isUser ? "user" : "bot", data.messageId);
+        } else if (data.type === "update") {
+          addMessage(data.text, "bot", data.messageId);
+        }
+      };
+
+      document
+        .getElementById("commandInput")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") sendCommand();
+        });
+    </script>
+  </body>
+</html>

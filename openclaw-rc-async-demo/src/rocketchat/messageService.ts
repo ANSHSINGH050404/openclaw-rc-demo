@@ -1,4 +1,7 @@
+import { EventEmitter } from "events";
 import { logger } from "../logger";
+
+export const messageEmitter = new EventEmitter();
 
 export const MessageService = {
   updateMessage: async (
@@ -6,15 +9,25 @@ export const MessageService = {
     messageId: string,
     text: string,
   ): Promise<void> => {
-    // In a real implementation, this would call Rocket.Chat API: POST /api/v1/chat.update
     logger.info("RC", `Updated message in room ${roomId}: ${text}`);
+    messageEmitter.emit("message", { type: "update", roomId, messageId, text });
   },
 
-  sendMessage: async (roomId: string, text: string): Promise<string> => {
-    // In a real implementation, this would call Rocket.Chat API: POST /api/v1/chat.sendMessage
+  sendMessage: async (
+    roomId: string,
+    text: string,
+    senderId?: string,
+  ): Promise<string> => {
     const simulatedMessageId = `msg_${Math.random().toString(36).substr(2, 9)}`;
     logger.info("RC", `Sent placeholder message in room ${roomId}`, {
       simulatedMessageId,
+    });
+    messageEmitter.emit("message", {
+      type: "new",
+      roomId,
+      messageId: simulatedMessageId,
+      text,
+      senderId,
     });
     return simulatedMessageId;
   },
